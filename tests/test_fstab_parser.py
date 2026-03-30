@@ -114,6 +114,19 @@ def test_load_and_save(tmp_path: Path) -> None:
     assert out.read_text(encoding="utf-8") == text
 
 
+
+
+def test_load_and_save_preserves_crlf_newlines(tmp_path: Path) -> None:
+    source = tmp_path / "fstab.crlf"
+    out = tmp_path / "fstab.out"
+    raw = b"UUID=abc / ext4 defaults 0 1\r\n#comment\r\n"
+    source.write_bytes(raw)
+
+    parsed = load_fstab(str(source))
+    save_fstab(parsed, str(out))
+
+    assert out.read_bytes() == raw
+
 def test_large_file_parsing() -> None:
     text = "".join(f"UUID={i} /mnt/{i} ext4 defaults 0 2\n" for i in range(10000))
     parsed = parse_fstab(text)

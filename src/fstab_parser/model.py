@@ -228,7 +228,8 @@ def parse_fstab(text: str, *, strict: bool = True) -> Fstab:
 
 
 def load_fstab(path: str) -> Fstab:
-    return parse_fstab(Path(path).read_text(encoding="utf-8"))
+    with Path(path).open("r", encoding="utf-8", newline="") as fstab_file:
+        return parse_fstab(fstab_file.read())
 
 
 def dump_fstab(fstab: Fstab) -> str:
@@ -236,7 +237,8 @@ def dump_fstab(fstab: Fstab) -> str:
 
 
 def save_fstab(fstab: Fstab, path: str) -> None:
-    Path(path).write_text(dump_fstab(fstab), encoding="utf-8")
+    with Path(path).open("w", encoding="utf-8", newline="") as fstab_file:
+        fstab_file.write(dump_fstab(fstab))
 
 
 def decode_escapes(value: str) -> str:
