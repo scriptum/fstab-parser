@@ -155,6 +155,46 @@ def test_custom_filtering_via_iterator_with_path_normalization() -> None:
     assert [entry.fs_file for entry in entries] == ["/var", "/var/tmp/./"]
 
 
+def test_bulk_add_security_options_for_ext4_and_xfs_with_exclusions() -> None:
+    text = (
+        "UUID=root / ext4 defaults 0 1\n"
+        "UUID=usr /usr/ ext4 defaults 0 2\n"
+        "UUID=var /var xfs defaults 0 2\n"
+        "UUID=home /home/ ext4 defaults 0 2\n"
+        "UUID=tmp /tmp ext4 defaults 0 2\n"
+        "UUID=opt /opt xfs rw,nosuid 0 2\n"
+        "tmpfs /run tmpfs defaults 0 0\n"
+    )
+    parsed = parse_fstab(text)
+
+    excluded = {"/", "/usr", "/var", "/home"}
+    for entry in parsed.iter_entries():
+        if entry.fs_vfstype not in {"ext4", "xfs"}:
+            continue
+        if entry.normalized_mountpoint() in excluded:
+            continue
+        entry.set_option("nosuid")
+        entry.set_option("noexec")
+
+    options_by_mountpoint = {entry.normalized_mountpoint(): entry.get_options() for entry in parsed.iter_entries()}
+
+    assert "nosuid" not in options_by_mountpoint["/"]
+    assert "noexec" not in options_by_mountpoint["/"]
+    assert "nosuid" not in options_by_mountpoint["/usr"]
+    assert "noexec" not in options_by_mountpoint["/usr"]
+    assert "nosuid" not in options_by_mountpoint["/var"]
+    assert "noexec" not in options_by_mountpoint["/var"]
+    assert "nosuid" not in options_by_mountpoint["/home"]
+    assert "noexec" not in options_by_mountpoint["/home"]
+
+    assert "nosuid" in options_by_mountpoint["/tmp"]
+    assert "noexec" in options_by_mountpoint["/tmp"]
+    assert "nosuid" in options_by_mountpoint["/opt"]
+    assert "noexec" in options_by_mountpoint["/opt"]
+    assert "nosuid" not in options_by_mountpoint["/run"]
+    assert "noexec" not in options_by_mountpoint["/run"]
+
+
 def test_large_file_parsing() -> None:
     text = "".join(f"UUID={i} /mnt/{i} ext4 defaults 0 2\n" for i in range(10000))
     parsed = parse_fstab(text)
