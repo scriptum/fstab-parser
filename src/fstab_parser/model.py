@@ -2,7 +2,8 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Callable, Optional
+from posixpath import normpath
+from typing import Callable, Iterable, Optional
 
 
 class FstabParseError(Exception):
@@ -94,6 +95,14 @@ class EntryLine:
         tokens = [t for t in self.fs_mntops.split(",") if t]
         self.fs_mntops = ",".join(t for t in tokens if t.split("=", 1)[0] != key)
 
+    def has_option(self, key: str) -> bool:
+        return key in self.get_options()
+
+
+def normalize_mountpoint(path: str) -> str:
+    normalized = normpath(path)
+    return "/" if normalized == "." else normalized
+
 
 FstabLine = EntryLine | CommentLine | BlankLine
 
@@ -106,10 +115,24 @@ class Fstab:
         return [line for line in self.lines if isinstance(line, EntryLine)]
 
     def find_by_mountpoint(self, path: str) -> EntryLine:
+        target = normalize_mountpoint(path)
         for entry in self.entries():
-            if entry.fs_file == path:
+            if normalize_mountpoint(entry.fs_file) == target:
                 return entry
         raise KeyError(f"No mountpoint found for {path}")
+
+    def find_entries_without_option(
+        self,
+        option: str,
+        *,
+        exclude_mountpoints: Iterable[str] = (),
+    ) -> list[EntryLine]:
+        excluded = {normalize_mountpoint(path) for path in exclude_mountpoints}
+        return [
+            entry
+            for entry in self.entries()
+            if normalize_mountpoint(entry.fs_file) not in excluded and not entry.has_option(option)
+        ]
 
     def add_entry(self, entry: EntryLine) -> None:
         self.lines.append(entry)

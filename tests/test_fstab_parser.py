@@ -73,6 +73,12 @@ def test_mutation_preserves_layout_minimally() -> None:
     assert dump_fstab(parsed) == "UUID=abc\t/\txfs\tdefaults\t0\t1 # root\n"
 
 
+def test_find_by_mountpoint_normalizes_paths() -> None:
+    parsed = parse_fstab("UUID=abc /var// ext4 defaults 0 2\n")
+
+    assert parsed.find_by_mountpoint("/var/").fs_spec == "UUID=abc"
+
+
 def test_mount_option_manipulation() -> None:
     entry = EntryLine("UUID=abc", "/", "ext4", "defaults,noauto,x-systemd.device-timeout=10", "0", "1")
 
@@ -126,6 +132,26 @@ def test_load_and_save_preserves_crlf_newlines(tmp_path: Path) -> None:
     save_fstab(parsed, str(out))
 
     assert out.read_bytes() == raw
+
+def test_find_entries_without_nosuid_with_exclusions() -> None:
+    text = (
+        "UUID=root / ext4 defaults 0 1\n"
+        "UUID=usr /usr/ ext4 defaults,nosuid 0 2\n"
+        "UUID=var /var// ext4 defaults 0 2\n"
+        "UUID=tmp /tmp ext4 rw,nodev 0 2\n"
+        "UUID=home /home/./ ext4 rw 0 2\n"
+        "UUID=opt /opt ext4 rw,nosuid 0 2\n"
+    )
+    parsed = parse_fstab(text)
+
+    entries = parsed.find_entries_without_option(
+        "nosuid",
+        exclude_mountpoints=("/", "/usr", "/var"),
+    )
+
+    assert [entry.fs_file for entry in entries] == ["/tmp", "/home/./"]
+
+
 
 def test_large_file_parsing() -> None:
     text = "".join(f"UUID={i} /mnt/{i} ext4 defaults 0 2\n" for i in range(10000))

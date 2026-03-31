@@ -9,6 +9,7 @@ from .model import (
     dump_fstab,
     encode_escapes,
     load_fstab,
+    normalize_mountpoint,
     parse_fstab,
     save_fstab,
 )
@@ -24,6 +25,7 @@ __all__ = [
     "dump_fstab",
     "encode_escapes",
     "load_fstab",
+    "normalize_mountpoint",
     "parse_fstab",
     "save_fstab",
 ]
