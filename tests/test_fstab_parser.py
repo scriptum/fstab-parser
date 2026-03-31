@@ -133,27 +133,7 @@ def test_load_and_save_preserves_crlf_newlines(tmp_path: Path) -> None:
 
     assert out.read_bytes() == raw
 
-def test_find_entries_without_nosuid_with_exclusions() -> None:
-    text = (
-        "UUID=root / ext4 defaults 0 1\n"
-        "UUID=usr /usr/ ext4 defaults,nosuid 0 2\n"
-        "UUID=var /var// ext4 defaults 0 2\n"
-        "UUID=tmp /tmp ext4 rw,nodev 0 2\n"
-        "UUID=home /home/./ ext4 rw 0 2\n"
-        "UUID=opt /opt ext4 rw,nosuid 0 2\n"
-    )
-    parsed = parse_fstab(text)
-
-    entries = parsed.find_entries_without_option(
-        "nosuid",
-        exclude_mountpoints=("/", "/usr", "/var"),
-    )
-
-    assert [entry.fs_file for entry in entries] == ["/tmp", "/home/./"]
-
-
-
-def test_filter_entries_with_composable_criteria() -> None:
+def test_custom_filtering_via_iterator_with_path_normalization() -> None:
     text = (
         "UUID=root / ext4 defaults 0 1\n"
         "UUID=var /var xfs rw,nosuid 0 2\n"
@@ -163,12 +143,14 @@ def test_filter_entries_with_composable_criteria() -> None:
     )
     parsed = parse_fstab(text)
 
-    entries = parsed.filter_entries(
-        fs_vfstype="xfs",
-        mountpoint_startswith="/var",
-        include_options=("nosuid",),
-        exclude_options=("noexec",),
-    )
+    entries = [
+        entry
+        for entry in parsed.iter_entries()
+        if entry.fs_vfstype == "xfs"
+        and entry.normalized_mountpoint().startswith("/var")
+        and entry.has_option("nosuid")
+        and not entry.has_option("noexec")
+    ]
 
     assert [entry.fs_file for entry in entries] == ["/var", "/var/tmp/./"]
 

@@ -14,10 +14,10 @@ entry.set_option("noauto")
 print(dump_fstab(fstab))
 ```
 
-### Pythonic filtering with composable criteria
+### Pythonic iteration with custom filtering
 
 ```python
-from fstab_parser import parse_fstab
+from fstab_parser import parse_fstab, normalize_mountpoint
 
 text = """\
 UUID=root / ext4 defaults 0 1
@@ -28,12 +28,16 @@ UUID=home /home xfs rw,nosuid 0 2
 """
 
 fstab = parse_fstab(text)
-entries = fstab.filter_entries(
-    fs_vfstype="xfs",
-    mountpoint_startswith="/var",
-    include_options=("nosuid",),
-    exclude_options=("noexec",),
-)
+var_prefix = normalize_mountpoint("/var")
+
+entries = [
+    entry
+    for entry in fstab.iter_entries()
+    if entry.fs_vfstype == "xfs"
+    and entry.normalized_mountpoint().startswith(var_prefix)
+    and entry.has_option("nosuid")
+    and not entry.has_option("noexec")
+]
 
 # ['/var', '/var/tmp/./']
 print([entry.fs_file for entry in entries])
