@@ -14,26 +14,28 @@ entry.set_option("noauto")
 print(dump_fstab(fstab))
 ```
 
-### Pythonic mountpoint filtering with path normalization
+### Pythonic filtering with composable criteria
 
 ```python
 from fstab_parser import parse_fstab
 
 text = """\
 UUID=root / ext4 defaults 0 1
-UUID=usr /usr/ ext4 defaults,nosuid 0 2
-UUID=var /var// ext4 defaults 0 2
-UUID=tmp /tmp ext4 rw,nodev 0 2
-UUID=home /home/./ ext4 rw 0 2
+UUID=var /var xfs rw,nosuid 0 2
+UUID=varlog /var/log/ xfs rw,nosuid,noexec 0 2
+UUID=vartmp /var/tmp/./ xfs rw,nosuid 0 2
+UUID=home /home xfs rw,nosuid 0 2
 """
 
 fstab = parse_fstab(text)
-entries = fstab.find_entries_without_option(
-    "nosuid",
-    exclude_mountpoints=("/", "/usr", "/var"),
+entries = fstab.filter_entries(
+    fs_vfstype="xfs",
+    mountpoint_startswith="/var",
+    include_options=("nosuid",),
+    exclude_options=("noexec",),
 )
 
-# ['/tmp', '/home/./']
+# ['/var', '/var/tmp/./']
 print([entry.fs_file for entry in entries])
 ```
 

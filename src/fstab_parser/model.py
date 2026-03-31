@@ -121,6 +121,41 @@ class Fstab:
                 return entry
         raise KeyError(f"No mountpoint found for {path}")
 
+    def filter_entries(
+        self,
+        *,
+        fs_vfstype: Optional[str] = None,
+        mountpoint_startswith: Optional[str] = None,
+        include_options: Iterable[str] = (),
+        exclude_options: Iterable[str] = (),
+        predicate: Optional[Callable[[EntryLine], bool]] = None,
+    ) -> list[EntryLine]:
+        normalized_prefix = (
+            normalize_mountpoint(mountpoint_startswith)
+            if mountpoint_startswith is not None
+            else None
+        )
+        required_options = tuple(include_options)
+        forbidden_options = tuple(exclude_options)
+
+        def matches(entry: EntryLine) -> bool:
+            if fs_vfstype is not None and entry.fs_vfstype != fs_vfstype:
+                return False
+
+            normalized_mountpoint = normalize_mountpoint(entry.fs_file)
+            if normalized_prefix is not None and not normalized_mountpoint.startswith(normalized_prefix):
+                return False
+
+            options = entry.get_options()
+            if required_options and not all(option in options for option in required_options):
+                return False
+            if forbidden_options and any(option in options for option in forbidden_options):
+                return False
+
+            return predicate(entry) if predicate is not None else True
+
+        return [entry for entry in self.entries() if matches(entry)]
+
     def find_entries_without_option(
         self,
         option: str,
@@ -128,11 +163,10 @@ class Fstab:
         exclude_mountpoints: Iterable[str] = (),
     ) -> list[EntryLine]:
         excluded = {normalize_mountpoint(path) for path in exclude_mountpoints}
-        return [
-            entry
-            for entry in self.entries()
-            if normalize_mountpoint(entry.fs_file) not in excluded and not entry.has_option(option)
-        ]
+        return self.filter_entries(
+            exclude_options=(option,),
+            predicate=lambda entry: normalize_mountpoint(entry.fs_file) not in excluded,
+        )
 
     def add_entry(self, entry: EntryLine) -> None:
         self.lines.append(entry)

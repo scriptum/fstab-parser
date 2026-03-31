@@ -153,6 +153,26 @@ def test_find_entries_without_nosuid_with_exclusions() -> None:
 
 
 
+def test_filter_entries_with_composable_criteria() -> None:
+    text = (
+        "UUID=root / ext4 defaults 0 1\n"
+        "UUID=var /var xfs rw,nosuid 0 2\n"
+        "UUID=varlog /var/log/ xfs rw,nosuid,noexec 0 2\n"
+        "UUID=vartmp /var/tmp/./ xfs rw,nosuid 0 2\n"
+        "UUID=home /home xfs rw,nosuid 0 2\n"
+    )
+    parsed = parse_fstab(text)
+
+    entries = parsed.filter_entries(
+        fs_vfstype="xfs",
+        mountpoint_startswith="/var",
+        include_options=("nosuid",),
+        exclude_options=("noexec",),
+    )
+
+    assert [entry.fs_file for entry in entries] == ["/var", "/var/tmp/./"]
+
+
 def test_large_file_parsing() -> None:
     text = "".join(f"UUID={i} /mnt/{i} ext4 defaults 0 2\n" for i in range(10000))
     parsed = parse_fstab(text)
